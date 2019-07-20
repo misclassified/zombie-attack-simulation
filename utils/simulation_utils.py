@@ -33,14 +33,19 @@ def timing(f):
 def move_one_random_step(
     start_lat, start_lon, km, iterations = 3, bbox=None, get_distance=False, verbose=False):
 
-
     # Select a random theta
-    random_theta = np.random.choice(
-        np.linspace(0, 2*np.pi, 1000))
+    random_theta_a = np.random.choice(np.linspace(0, np.pi, 1000))
+    random_theta_b = np.random.choice(np.linspace(np.pi, 2*np.pi, 1000))
+
+    start_theta = np.random.choice([random_theta_a, random_theta_b])
+    if start_theta == random_theta_a:
+        alternative_theta = random_theta_b
+    else:
+        alternative_theta = random_theta_a
 
     # Find new random coordinates
-    a_n = start_lat + (0.013*km) * np.cos(random_theta)
-    b_n = start_lon + (0.013*km) * np.sin(random_theta)
+    a_n = start_lat + (0.013*km) * np.cos(start_theta)
+    b_n = start_lon + (0.013*km) * np.sin(start_theta)
 
 
     if bbox:
@@ -56,8 +61,8 @@ def move_one_random_step(
 
             else:
                 iteration += 1
-                a_n = start_lat + (0.013*(km/iteration) * np.cos(random_theta))
-                b_n = start_lon + (0.013*(km/iteration) * np.sin(random_theta))
+                a_n = start_lat + (0.013*(km/iteration) * np.cos(alternative_theta))
+                b_n = start_lon + (0.013*(km/iteration) * np.sin(alternative_theta))
                 if verbose:
                     print("Finding valid position, iter {}".format(iteration))
 
