@@ -4,6 +4,7 @@ from functools import wraps
 from time import time
 
 from geopy import distance
+import geojson
 from scipy.spatial.distance import euclidean
 from sklearn.metrics import pairwise_distances
 import sys
@@ -32,6 +33,17 @@ def timing(f):
 
 def move_one_random_step(
     start_lat, start_lon, km, iterations = 3, bbox=None, get_distance=False, verbose=False):
+    """Makes a random move in an arbitrary direction
+
+    Arguments:
+        start_lat = float
+        start_lon = float
+        km = int, how many km it moves
+        iterations = int, extra tries if hitting the bbox boundaries
+        bbox = dict of bounding box coordinates, with keys min_lat, max_lat,
+            min_lon, max_lon
+        get_distance = Boolean, return the distance travelled
+        verbose = Boolean, level of verbosity"""
 
     # Select a random theta
     random_theta_a = np.random.choice(np.linspace(0, np.pi, 1000))
@@ -88,6 +100,9 @@ def move_one_random_step(
 
 
 def find_all_zombie_positions(population):
+    """Scan the population array and find zombies
+    Arguments:
+        population = array of dicts"""
 
     zombies = list(filter(
         lambda x: x['type'].__str__() == 'Zombie', population))
@@ -102,6 +117,9 @@ def find_all_zombie_positions(population):
 
 
 def find_all_survivors_positions(population):
+    """Scan the population array and find zombies
+    Arguments:
+        population = array of dicts"""
 
     survivors = list(filter(
         lambda x: x['type'].__str__() == 'Survivor', population))
@@ -115,6 +133,9 @@ def find_all_survivors_positions(population):
     return positions
 
 def inherit_zombie_attributes(player):
+    """Handle inheritance of attributes from Zombie class
+    Arguments:
+        player = class of Survivor, Removed or Zombie"""
 
     new_state = Removed()
 
@@ -125,6 +146,9 @@ def inherit_zombie_attributes(player):
     return new_state
 
 def inherit_survivor_attributes(player, zombie_speed_ratio):
+    """Handle inheritance of attributes from Zombie class
+        Arguments:
+            player = class of Survivor, Removed or Zombie"""
 
     new_state = Zombie()
 
@@ -138,6 +162,13 @@ def inherit_survivor_attributes(player, zombie_speed_ratio):
 
 @timing
 def find_pairwise_distances(population, quadkey_level):
+    """Compute pairwise distances between zombies and
+    survivors nearby. Uses quadkey for efficency
+
+    Arguments:
+        population = list of dictionaries
+        quadkey_level = int
+    """
 
     zombies = find_all_zombie_positions(population)
     survivors = find_all_survivors_positions(population)
@@ -155,6 +186,13 @@ def find_pairwise_distances(population, quadkey_level):
     return zombies, survivors, matches
 
 def find_matches(matches, threshold_distance):
+    """After computing the distances find pairs that
+    are at as close as the threshold_distance.
+
+    Arguments:
+        matches = array from find_pairwise_distances
+        threshold_distance = float, distance in lat-long coordinates
+    """
 
     surv_meeting_zombies = np.where(matches <= threshold_distance)
     meetings = list(zip(surv_meeting_zombies[0], surv_meeting_zombies[1]))
@@ -162,6 +200,15 @@ def find_matches(matches, threshold_distance):
     return meetings
 
 def run_duels(meetings, survival_prob, zombie_prob, removal_prob):
+    """Given the pairs that are close run duels that can end up
+    with survival, zombification or destruction of zombie.
+
+    Arguments:
+        meeting = array from find_matches
+        survival_prob = float, probability to survive
+        zombie_prob = float, probability to succumb to a zombie
+        removal_prob = float, probability to kill a zombie
+    """
 
     prob = [survival_prob, zombie_prob, removal_prob]
 
@@ -171,8 +218,35 @@ def run_duels(meetings, survival_prob, zombie_prob, removal_prob):
 
     # Find which zombies and survivors are dead
     dead_survivors = list(filter(lambda x: x[0] == 1, outcomes))
-#     print(dead_survivors)
-
     dead_zombies = list(filter(lambda x: x[0] == -1, outcomes))
 
     return dead_survivors, dead_zombies
+
+def get_quadkey_as_geojson(qk_object, properties=None):
+        """Finds quadkey geojson"""
+
+        q = qk_object
+
+        (x, y), level = q.to_tile()
+        top_left = quadkey.from_tile((x, y), level).to_geo()
+        bottom_right = quadkey.from_tile((x + 1, y + 1), level).to_geo()
+
+        # bottom row correction
+        if top_left[0] < bottom_right[0]:
+            bottom_right = (-bottom_right[0], bottom_right[1])
+        # last column correction
+        if top_left[1] > bottom_right[1]:
+            bottom_right = (bottom_right[0], -bottom_right[1])
+
+        coords = [top_left,
+                  [top_left[0], bottom_right[1]],
+                  bottom_right,
+                  [bottom_right[0], top_left[1]],
+                  top_left]
+
+        coords = [[p[::-1] for p in coords]]
+        gj = geojson.Feature(
+                    geometry=geojson.Polygon(coords), properties=properties
+                )
+
+        return gj
