@@ -1,3 +1,4 @@
+
 class Survivor():
     """Survivors are people of the population.
     """
