@@ -6,6 +6,6 @@ os
 re
 geopy==1.20.0
 tqdm==4.31.1
-scipy==1.1.0
+scipy==1.10.0
 scikit-learn==0.19.1
 ggeojson==2.4.1
